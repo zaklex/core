@@ -515,6 +515,10 @@ class _ScriptRun:
         done = asyncio.Event()
 
         async def done_cb(variables, skip_condition=False, context=None):
+            if self._variables:
+                self._variables["wait_trigger"] = variables["trigger"]
+            else:
+                self._variables = {"wait_trigger": variables["trigger"]}
             done.set()
 
         info = {"name": self._script.name, "home_assistant_start": False}
