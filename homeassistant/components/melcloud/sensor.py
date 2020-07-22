@@ -1,11 +1,13 @@
 """Support for MelCloud device sensors."""
 import logging
 
-from pymelcloud import DEVICE_TYPE_ATA, DEVICE_TYPE_ATW
+from pymelcloud import DEVICE_TYPE_ATA, DEVICE_TYPE_ATW, DEVICE_TYPE_ERV
 from pymelcloud.atw_device import Zone
 
 from homeassistant.const import (
     DEVICE_CLASS_TEMPERATURE,
+    DEVICE_CLASS_SIGNAL_STRENGTH,
+    CONCENTRATION_PARTS_PER_MILLION,
     ENERGY_KILO_WATT_HOUR,
     TEMP_CELSIUS,
 )
@@ -38,6 +40,14 @@ ATA_SENSORS = {
         ATTR_VALUE_FN: lambda x: x.device.total_energy_consumed,
         ATTR_ENABLED_FN: lambda x: x.device.has_energy_consumed_meter,
     },
+    "wifi": {
+        ATTR_MEASUREMENT_NAME: "Wifi Signal",
+        ATTR_ICON: "mdi:wifi",
+        ATTR_UNIT: "dBm",
+        ATTR_DEVICE_CLASS: DEVICE_CLASS_SIGNAL_STRENGTH,
+        ATTR_VALUE_FN: lambda x: x.device.wifi_signal,
+        ATTR_ENABLED_FN: lambda x: True,
+    },
 }
 ATW_SENSORS = {
     "outside_temperature": {
@@ -54,6 +64,14 @@ ATW_SENSORS = {
         ATTR_UNIT: TEMP_CELSIUS,
         ATTR_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE,
         ATTR_VALUE_FN: lambda x: x.device.tank_temperature,
+        ATTR_ENABLED_FN: lambda x: True,
+    },
+    "wifi": {
+        ATTR_MEASUREMENT_NAME: "Wifi Signal",
+        ATTR_ICON: "mdi:wifi",
+        ATTR_UNIT: "dBm",
+        ATTR_DEVICE_CLASS: DEVICE_CLASS_SIGNAL_STRENGTH,
+        ATTR_VALUE_FN: lambda x: x.device.wifi_signal,
         ATTR_ENABLED_FN: lambda x: True,
     },
 }
@@ -83,6 +101,48 @@ ATW_ZONE_SENSORS = {
         ATTR_ENABLED_FN: lambda x: True,
     },
 }
+ERV_SENSORS = {
+    "room_temperature": {
+        ATTR_MEASUREMENT_NAME: "Room Temperature",
+        ATTR_ICON: "mdi:thermometer",
+        ATTR_UNIT: TEMP_CELSIUS,
+        ATTR_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE,
+        ATTR_VALUE_FN: lambda x: x.device.room_temperature,
+        ATTR_ENABLED_FN: lambda x: True,
+    },
+    "outside_temperature": {
+        ATTR_MEASUREMENT_NAME: "Outside Temperature",
+        ATTR_ICON: "mdi:thermometer",
+        ATTR_UNIT: TEMP_CELSIUS,
+        ATTR_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE,
+        ATTR_VALUE_FN: lambda x: x.device.outside_temperature,
+        ATTR_ENABLED_FN: lambda x: True,
+    },
+    "energy": {
+        ATTR_MEASUREMENT_NAME: "Energy",
+        ATTR_ICON: "mdi:factory",
+        ATTR_UNIT: ENERGY_KILO_WATT_HOUR,
+        ATTR_DEVICE_CLASS: None,
+        ATTR_VALUE_FN: lambda x: x.device.total_energy_consumed,
+        ATTR_ENABLED_FN: lambda x: x.device.has_energy_consumed_meter,
+    },
+    "co2": {
+        ATTR_MEASUREMENT_NAME: "CO2",
+        ATTR_ICON: "mdi:periodic-table-co2",
+        ATTR_UNIT: CONCENTRATION_PARTS_PER_MILLION,
+        ATTR_DEVICE_CLASS: None,
+        ATTR_VALUE_FN: lambda x: x.device.room_co2_level,
+        ATTR_ENABLED_FN: lambda x: bool(x.device.room_co2_level),
+    },
+    "wifi": {
+        ATTR_MEASUREMENT_NAME: "Wifi Signal",
+        ATTR_ICON: "mdi:wifi",
+        ATTR_UNIT: "dBm",
+        ATTR_DEVICE_CLASS: DEVICE_CLASS_SIGNAL_STRENGTH,
+        ATTR_VALUE_FN: lambda x: x.device.wifi_signal,
+        ATTR_ENABLED_FN: lambda x: True,
+    },
+}
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -109,6 +169,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
             for zone in mel_device.device.zones
             for measurement, definition, in ATW_ZONE_SENSORS.items()
             if definition[ATTR_ENABLED_FN](zone)
+        ]
+        + [
+            MelDeviceSensor(mel_device, measurement, definition)
+            for measurement, definition in ERV_SENSORS.items()
+            for mel_device in mel_devices[DEVICE_TYPE_ERV]
+            if definition[ATTR_ENABLED_FN](mel_device)
         ],
         True,
     )
@@ -177,3 +243,4 @@ class AtwZoneSensor(MelDeviceSensor):
     def state(self):
         """Return zone based state."""
         return self._def[ATTR_VALUE_FN](self._zone)
+
